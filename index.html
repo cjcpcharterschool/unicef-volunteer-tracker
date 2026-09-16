@@ -1025,6 +1025,17 @@
             <h2>Advisor Controls</h2>
 
             <div class="admin-section">
+                <h3>⏳ Pending Hour Approvals</h3>
+                <p style="margin-bottom: 15px; color: #666;">Review and approve volunteer hours submissions</p>
+                <div id="pendingApprovalsContainer" style="display: none;">
+                    <div id="pendingApprovalsList"></div>
+                </div>
+                <div id="noPendingMessage" style="text-align: center; padding: 30px; color: #999;">
+                    No pending hours to approve
+                </div>
+            </div>
+
+            <div class="admin-section">
                 <h3>Data Export</h3>
                 <p style="margin-bottom: 15px; color: #666;">Download all volunteer data as CSV file</p>
                 <button class="button" onclick="exportDataToCSV()">Export All Data (CSV)</button>
@@ -1273,6 +1284,12 @@
         }
     });
 
+    // Check if user is Secretary or Advisor
+    function isApprover() {
+        const approvers = ['Nilakshya Rajora', 'Dr. Goli', 'Aarohi Banerjee'];
+        return approvers.some(name => currentUser?.displayName?.includes(name));
+    }
+
     // Load user stats
     async function loadUserStats(uid) {
         const snapshot = await db.collection('volunteers').where('uid', '==', uid).get();
@@ -1303,22 +1320,43 @@
         document.getElementById('awardTier').textContent = tier.tier;
         document.getElementById('awardCard').style.backgroundColor = tier.color;
 
-        // Logs
+        // Logs - show approved logs
         const logs = userStats.logs || [];
-        if (logs.length > 0) {
+        const pendingLogs = userStats.pendingLogs || [];
+
+        if (logs.length > 0 || pendingLogs.length > 0) {
             document.getElementById('logsSection').style.display = 'block';
             const logsList = document.getElementById('logsList');
-            logsList.innerHTML = logs.slice().reverse().map(log => `
-                <div class="log-item">
-                    <div class="log-event">${log.event}</div>
-                    <div class="log-hours">${log.hours} hrs</div>
-                    <div class="log-date">${log.date}</div>
-                </div>
-            `).join('');
+
+            let html = '';
+
+            // Show pending logs first
+            pendingLogs.forEach(log => {
+                html += `
+                    <div class="log-item" style="opacity: 0.7; border-left-color: #ffc107;">
+                        <div class="log-event">${log.event} <span style="background: #ffc107; color: #1a1a1a; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700;">PENDING</span></div>
+                        <div class="log-hours">${log.hours} hrs</div>
+                        <div class="log-date">${log.date}</div>
+                    </div>
+                `;
+            });
+
+            // Show approved logs
+            logs.slice().reverse().forEach(log => {
+                html += `
+                    <div class="log-item">
+                        <div class="log-event">${log.event}</div>
+                        <div class="log-hours">${log.hours} hrs</div>
+                        <div class="log-date">${log.date}</div>
+                    </div>
+                `;
+            });
+
+            logsList.innerHTML = html;
         }
     }
 
-    // Log hours
+    // Log hours - creates pending approval
     async function logHours() {
         const eventName = document.getElementById('eventName').value;
         const hoursWorked = parseFloat(document.getElementById('hoursWorked').value);
@@ -1329,18 +1367,20 @@
         }
 
         try {
-            const newTotal = (userStats.totalHours || 0) + hoursWorked;
-            const newEvents = (userStats.eventsAttended || 0) + 1;
-            const newLogs = [...(userStats.logs || []), {
+            // Add to pending approvals instead of directly counting
+            const pendingLogs = [...(userStats.pendingLogs || []), {
                 event: eventName,
                 hours: hoursWorked,
-                date: new Date().toLocaleDateString()
+                date: new Date().toLocaleDateString(),
+                volunteerId: userStats.id,
+                volunteerName: currentUser.displayName || currentUser.email,
+                volunteerEmail: currentUser.email,
+                timestamp: new Date(),
+                status: 'pending'
             }];
 
             await db.collection('volunteers').doc(userStats.id).update({
-                totalHours: newTotal,
-                eventsAttended: newEvents,
-                logs: newLogs
+                pendingLogs: pendingLogs
             });
 
             document.getElementById('eventName').value = '';
@@ -1348,8 +1388,8 @@
 
             await loadUserStats(currentUser.uid);
             await loadAllVolunteers();
-            addSystemLog(`${currentUser.displayName || currentUser.email} logged ${hoursWorked} hours for ${eventName}`, currentUser.email);
-            alert('Hours logged successfully!');
+            addSystemLog(`${currentUser.displayName || currentUser.email} submitted ${hoursWorked} hours for ${eventName} (pending approval)`, currentUser.email);
+            alert('Hours submitted for approval! Waiting for Secretary or Advisor review.');
         } catch (error) {
             alert('Error: ' + error.message);
         }
@@ -1457,7 +1497,105 @@
     }
 
     // ADVISOR FUNCTIONS
+    async function approvePendingHours(volunteerId, logIndex) {
+        try {
+            const volunteer = allVolunteers.find(v => v.id === volunteerId);
+            if (!volunteer) return;
+
+            const pendingLog = volunteer.pendingLogs[logIndex];
+
+            // Add to approved logs
+            const approvedLogs = [...(volunteer.logs || []), {
+                event: pendingLog.event,
+                hours: pendingLog.hours,
+                date: pendingLog.date,
+                approvedBy: currentUser.displayName || currentUser.email,
+                approvedAt: new Date().toLocaleDateString()
+            }];
+
+            // Update volunteer totals and remove from pending
+            const newPendingLogs = volunteer.pendingLogs.filter((_, i) => i !== logIndex);
+            const newTotal = (volunteer.totalHours || 0) + pendingLog.hours;
+            const newEvents = (volunteer.eventsAttended || 0) + 1;
+
+            await db.collection('volunteers').doc(volunteerId).update({
+                logs: approvedLogs,
+                pendingLogs: newPendingLogs,
+                totalHours: newTotal,
+                eventsAttended: newEvents
+            });
+
+            await loadAllVolunteers();
+            addSystemLog(`${currentUser.displayName} approved ${pendingLog.hours} hours for ${volunteer.name} (${pendingLog.event})`, currentUser.email);
+            alert(`✅ Approved ${pendingLog.hours} hours for ${volunteer.name}`);
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    async function rejectPendingHours(volunteerId, logIndex) {
+        if (!confirm('Reject these hours?')) return;
+
+        try {
+            const volunteer = allVolunteers.find(v => v.id === volunteerId);
+            if (!volunteer) return;
+
+            const pendingLog = volunteer.pendingLogs[logIndex];
+            const newPendingLogs = volunteer.pendingLogs.filter((_, i) => i !== logIndex);
+
+            await db.collection('volunteers').doc(volunteerId).update({
+                pendingLogs: newPendingLogs
+            });
+
+            await loadAllVolunteers();
+            addSystemLog(`${currentUser.displayName} rejected ${pendingLog.hours} hours for ${volunteer.name} (${pendingLog.event})`, currentUser.email);
+            alert(`❌ Rejected hours submission`);
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
     function updateAdvisorDashboard() {
+        // Show pending approvals if user is approver
+        if (isApprover()) {
+            let pendingCount = 0;
+            let pendingHTML = '';
+
+            allVolunteers.forEach(volunteer => {
+                if (volunteer.pendingLogs && volunteer.pendingLogs.length > 0) {
+                    volunteer.pendingLogs.forEach((log, idx) => {
+                        pendingCount++;
+                        pendingHTML += `
+                            <div style="padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="font-weight: 700; color: #1a1a1a; margin-bottom: 8px;">
+                                    ${volunteer.name || volunteer.email}
+                                </div>
+                                <div style="font-size: 14px; color: #666; margin-bottom: 6px;">
+                                    <strong>${log.hours} hours</strong> - ${log.event}
+                                </div>
+                                <div style="font-size: 12px; color: #999; margin-bottom: 10px;">
+                                    Submitted: ${log.date}
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <button class="button" style="background: #28a745; margin: 0;" onclick="approvePendingHours('${volunteer.id}', ${idx})">✓ Approve</button>
+                                    <button class="button danger" style="margin: 0;" onclick="rejectPendingHours('${volunteer.id}', ${idx})">✕ Reject</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            if (pendingCount > 0) {
+                document.getElementById('pendingApprovalsContainer').style.display = 'block';
+                document.getElementById('noPendingMessage').style.display = 'none';
+                document.getElementById('pendingApprovalsList').innerHTML = pendingHTML;
+            } else {
+                document.getElementById('pendingApprovalsContainer').style.display = 'none';
+                document.getElementById('noPendingMessage').style.display = 'block';
+            }
+        }
+
         // Stats
         document.getElementById('totalVolunteers').textContent = allVolunteers.length;
 
