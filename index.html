@@ -1026,6 +1026,26 @@
                 <h3>Recent Activity</h3>
                 <div class="logs-list" id="logsList"></div>
             </div>
+
+            <div class="form-section" id="claimRoleSection" style="display: none;">
+                <h3>📋 Claim Board Role</h3>
+                <p style="color: #666; margin-bottom: 15px; font-size: 13px;">Apply for a board position. The Secretary (Nilakshya) will review and approve your claim.</p>
+                <select id="claimRoleSelect" style="padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; margin-bottom: 12px;">
+                    <option value="">Select a role to claim</option>
+                    <option value="President">President</option>
+                    <option value="VP">Vice President</option>
+                    <option value="Secretary">Secretary</option>
+                    <option value="Treasurer">Treasurer</option>
+                    <option value="Social Media">Social Media Manager</option>
+                    <option value="Events and Outreach">Events and Outreach</option>
+                    <option value="Advisor">Advisor</option>
+                </select>
+                <button class="button" onclick="claimBoardRole()">Submit Role Claim</button>
+                <div id="roleClaimStatus" style="margin-top: 12px; padding: 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 6px; display: none;">
+                    <div style="font-weight: 700; color: #92400e; font-size: 13px;">⏳ Pending Approval</div>
+                    <div style="color: #b45309; font-size: 12px; margin-top: 4px;" id="roleClaimStatusText"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Leaderboard View -->
@@ -1068,6 +1088,17 @@
                 </div>
                 <div id="noIssuesMessage" style="text-align: center; padding: 30px; color: #999;">
                     No reported issues
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>👤 Pending Role Claims</h3>
+                <p style="margin-bottom: 15px; color: #666;">Volunteers claiming board positions</p>
+                <div id="roleClaimsContainer" style="display: none;">
+                    <div id="roleClaimsList"></div>
+                </div>
+                <div id="noRoleClaimsMessage" style="text-align: center; padding: 30px; color: #999;">
+                    No pending role claims
                 </div>
             </div>
 
@@ -1193,9 +1224,11 @@
     let currentUser = null;
     let isAdmin = false;
     let isAdvisor = false;
+    let isHardcodedBoardMember = false;
     let userStats = null;
     let allVolunteers = [];
     let systemLogs = [];
+    let pendingRoleClaims = [];
 
     // Advisors
     const ADVISORS = ['Dr. Goli', 'Aarohi Banerjee'];
@@ -1212,8 +1245,10 @@
             document.getElementById('appScreen').classList.remove('hidden');
             document.getElementById('userEmail').textContent = user.email;
 
-            // Check if admin
-            isAdmin = BOARD_MEMBERS_FLAT.some(name => user.displayName?.includes(name));
+            // Check if hardcoded board member (auto-admin)
+            isHardcodedBoardMember = BOARD_MEMBERS_FLAT.some(name => user.displayName?.includes(name));
+            isAdmin = isHardcodedBoardMember;
+
             if (isAdmin) {
                 document.getElementById('adminBadge').classList.remove('hidden');
                 document.getElementById('adminNavButton').classList.remove('hidden');
@@ -1236,6 +1271,11 @@
                 badge.textContent = 'Advisor';
                 document.querySelector('.header-right').insertBefore(badge, document.getElementById('adminBadge'));
                 document.getElementById('advisorNavButton').classList.remove('hidden');
+            }
+
+            // Load pending role claims if user is approver
+            if (isApprover()) {
+                await loadPendingRoleClaims();
             }
 
             // Create user in Firestore if new
@@ -1412,12 +1452,143 @@
         }
     }
 
+    // Claim board role
+    async function claimBoardRole() {
+        const roleType = document.getElementById('claimRoleSelect').value;
+
+        if (!roleType) {
+            alert('Please select a role');
+            return;
+        }
+
+        try {
+            // Check if user already has a pending or approved claim
+            const existing = await db.collection('roleClaims').where('uid', '==', currentUser.uid).get();
+            if (!existing.empty) {
+                alert('You already have a pending role claim. Wait for approval.');
+                return;
+            }
+
+            await db.collection('roleClaims').add({
+                uid: currentUser.uid,
+                email: currentUser.email,
+                name: currentUser.displayName || currentUser.email,
+                claimedRole: roleType,
+                timestamp: new Date(),
+                status: 'pending'
+            });
+
+            document.getElementById('claimRoleSelect').value = '';
+            alert('✅ Role claim submitted! Nilakshya (Secretary) will review and approve.');
+            addSystemLog(`${currentUser.displayName} claimed ${roleType} role (pending approval)`, currentUser.email);
+            loadUserStats(currentUser.uid);
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Load pending role claims
+    async function loadPendingRoleClaims() {
+        try {
+            const snapshot = await db.collection('roleClaims').where('status', '==', 'pending').get();
+            pendingRoleClaims = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.log('Role claims collection may not exist yet');
+        }
+    }
+
+    // Approve role claim
+    async function approveRoleClaim(claimId, volunteerId, role) {
+        const claim = pendingRoleClaims.find(c => c.id === claimId);
+        if (!claim) return;
+
+        try {
+            // Update claim status
+            await db.collection('roleClaims').doc(claimId).update({
+                status: 'approved',
+                approvedBy: currentUser.displayName || currentUser.email,
+                approvedAt: new Date()
+            });
+
+            // Add to board members
+            if (BOARD_MEMBERS[role]) {
+                if (!BOARD_MEMBERS[role].includes(claim.name)) {
+                    BOARD_MEMBERS[role].push(claim.name);
+                    BOARD_MEMBERS_FLAT.push(claim.name);
+                }
+            }
+
+            await loadPendingRoleClaims();
+            await loadAndDisplayRoleClaims();
+            addSystemLog(`${currentUser.displayName} approved ${claim.name} as ${role}`, currentUser.email);
+            alert(`✅ Approved ${claim.name} as ${role}`);
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Reject role claim
+    async function rejectRoleClaim(claimId) {
+        if (!confirm('Reject this role claim?')) return;
+
+        try {
+            await db.collection('roleClaims').doc(claimId).update({
+                status: 'rejected',
+                rejectedBy: currentUser.displayName || currentUser.email,
+                rejectedAt: new Date()
+            });
+
+            await loadPendingRoleClaims();
+            await loadAndDisplayRoleClaims();
+            alert('❌ Role claim rejected');
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    }
+
+    // Display role claims for approval
+    async function loadAndDisplayRoleClaims() {
+        try {
+            if (!document.getElementById('roleClaimsContainer')) return;
+
+            const snapshot = await db.collection('roleClaims').where('status', '==', 'pending').get();
+            const claims = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (claims.length > 0) {
+                document.getElementById('roleClaimsContainer').style.display = 'block';
+                document.getElementById('noRoleClaimsMessage').style.display = 'none';
+
+                const claimsHTML = claims.map(claim => `
+                    <div style="padding: 16px; background: #e7f3ff; border-left: 4px solid #2563eb; border-radius: 8px; margin-bottom: 12px;">
+                        <div style="font-weight: 700; color: #1a1a1a; margin-bottom: 8px;">
+                            ${claim.name} → <strong>${claim.claimedRole}</strong>
+                        </div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                            Email: ${claim.email}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button class="button" style="background: #28a745; margin: 0;" onclick="approveRoleClaim('${claim.id}', '${claim.uid}', '${claim.claimedRole}')">✓ Approve</button>
+                            <button class="button danger" style="margin: 0;" onclick="rejectRoleClaim('${claim.id}')">✕ Reject</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('roleClaimsList').innerHTML = claimsHTML;
+            } else {
+                document.getElementById('roleClaimsContainer').style.display = 'none';
+                document.getElementById('noRoleClaimsMessage').style.display = 'block';
+            }
+        } catch (error) {
+            console.log('Error loading role claims:', error);
+        }
+    }
+
     // Load user stats
     async function loadUserStats(uid) {
         const snapshot = await db.collection('volunteers').where('uid', '==', uid).get();
         if (!snapshot.empty) {
             userStats = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-            updateDashboard();
+            await updateDashboard();
         }
     }
 
@@ -1478,7 +1649,7 @@
     }
 
     // Update dashboard
-    function updateDashboard() {
+    async function updateDashboard() {
         if (!userStats) return;
 
         const hours = userStats.totalHours || 0;
@@ -1488,6 +1659,21 @@
         const tier = getAwardTier(hours);
         document.getElementById('awardTier').textContent = tier.tier;
         document.getElementById('awardCard').style.backgroundColor = tier.color;
+
+        // Show claim role section if not admin
+        if (!isAdmin) {
+            document.getElementById('claimRoleSection').style.display = 'block';
+
+            // Check if user has a pending claim
+            const claimSnapshot = await db.collection('roleClaims').where('uid', '==', currentUser.uid).get();
+            if (!claimSnapshot.empty) {
+                const claim = claimSnapshot.docs[0].data();
+                document.getElementById('roleClaimStatus').style.display = 'block';
+                document.getElementById('roleClaimStatusText').textContent = `Your claim for "${claim.claimedRole}" is pending approval.`;
+            }
+        } else {
+            document.getElementById('claimRoleSection').style.display = 'none';
+        }
 
         // Logs - show approved logs
         const logs = userStats.logs || [];
@@ -1691,6 +1877,7 @@
             document.getElementById('advisorNavButton').classList.add('active');
             updateAdvisorDashboard();
             loadAndDisplayIssues();
+            loadAndDisplayRoleClaims();
         }
     }
 
