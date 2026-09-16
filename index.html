@@ -3,6 +3,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CJCP UNICEF Tracker</title>
 <meta name="description" content="Volunteer hours, events, awards and board roles for CJCP UNICEF.">
@@ -752,7 +754,7 @@ tbody tr:hover{background:#fafcff}
 
     <!-- Help -->
     <section id="view-help" class="view hidden">
-      <div class="page-head"><div><h2>Help &amp; support</h2><p>Reports go straight to the Secretary's approvals inbox.</p></div></div>
+      <div class="page-head"><div><h2>Help &amp; support</h2><p>Reports go straight to the Secretary's approvals inbox. <span style="opacity:.6">Version 5 (Sept 16)</span></p></div></div>
       <div class="grid-2">
         <div class="card">
           <div class="card-head"><div><h3>Report an issue</h3><p>Hour disputes, duplicate accounts, bugs or anything else.</p></div></div>
@@ -944,7 +946,41 @@ function inviteMatches(inv, name, email) {
   const want = nameTokens(inv.name), have = nameTokens(name);
   return want.length > 0 && have.length > 0 && want.every(t => have.includes(t));
 }
-const roleOf = u => (!u ? 'Member' : isOwnerEmail(u.email) ? 'Secretary' : normRole(u.role));
+const lc = v => String(v || '').trim().toLowerCase();
+// An accepted board selection counts as that person's role even if their profile write was lost
+// or they signed in with a different account that uses the same email.
+function acceptedInviteFor(u) {
+  if (!u) return null;
+  const id = u.uid || u.id, email = lc(u.email);
+  return (S.invites || []).find(i => i.status === 'accepted' && !i.revoked
+    && ((i.acceptedUid && i.acceptedUid === id) || (email && (lc(i.acceptedEmail) === email || lc(i.email) === email)))) || null;
+}
+function roleOf(u) {
+  if (!u) return 'Member';
+  if (isOwnerEmail(u.email)) return 'Secretary';
+  const r = normRole(u.role);
+  if (r !== 'Member') return r;
+  const inv = acceptedInviteFor(u);
+  return inv ? normRole(inv.role) : 'Member';
+}
+// When someone loses a board role, their accepted selection stops counting too.
+function revokeInvitesFor(batch, u) {
+  (S.invites || []).filter(i => i.status === 'accepted' && !i.revoked && acceptedInviteFor(u) === i)
+    .forEach(i => batch.set(db.collection('boardInvites').doc(i.id), { revoked: true }, { merge: true }));
+}
+// Copies an accepted selection onto the signed-in person's profile if it is missing there.
+async function syncMyInviteRole() {
+  if (!S.user || S.syncingRole || isOwnerEmail(S.user.email)) return;
+  const meDoc = S.users.find(u => u.id === uid()) || S.me;
+  if (!meDoc || normRole(meDoc.role) !== 'Member') return;
+  const inv = acceptedInviteFor({ ...meDoc, uid: uid(), email: S.user.email });
+  if (!inv) return;
+  S.syncingRole = true;
+  try {
+    await vol(uid()).set({ role: normRole(inv.role), roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: 'Board selection' }, { merge: true });
+  } catch (err) { console.warn('Could not sync board role', err); }
+  finally { S.syncingRole = false; }
+}
 const roleChip = r => `<span class="role-chip ${r === 'Member' ? 'member' : 'board'}">${esc(r)}</span>`;
 const empty = (ic, title, text) => `<div class="empty"><div class="empty-ic">${icon(ic)}</div><b>${esc(title)}</b>${esc(text)}</div>`;
 function statCard(label, value, sub, ic, tone = '') {
@@ -1098,7 +1134,7 @@ function allInvites() {
   });
   S.invites.forEach(i => { if (!list.some(x => x.id === i.id)) list.push(i); });
   // The Secretary seat belongs to the owner account automatically, so it never shows as a pending selection.
-  return list.filter(i => i.status !== 'removed' && i.name && i.role && normRole(i.role) !== 'Secretary').map(i => ({ ...i, role: normRole(i.role), email: i.email || '' }));
+  return list.filter(i => i.status !== 'removed' && i.name && i.role && normRole(i.role) !== 'Secretary' && !nameTokens(i.name).every(t => nameTokens(OWNER_NAME).includes(t))).map(i => ({ ...i, role: normRole(i.role), email: i.email || '' }));
 }
 const inviteHolder = inv => {
   if (inv.status === 'accepted' && inv.acceptedUid) return S.users.find(u => (u.uid || u.id) === inv.acceptedUid) || { name: inv.acceptedName || inv.name };
@@ -1390,6 +1426,7 @@ function subscribe() {
     S.users = dedupeUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     const mine = S.users.find(u => u.id === me);
     if (mine) S.me = mine;
+    syncMyInviteRole();
     const role = myRole();
     if (role !== S.lastRole) {
       S.lastRole = role;
@@ -1452,6 +1489,9 @@ function subscribe() {
 
   listen(db.collection('boardInvites'), snap => {
     S.invites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    syncMyInviteRole();
+    const role = myRole();
+    if (S.started && role !== S.lastRole) { S.lastRole = role; toast(role === 'Member' ? 'Your board role was changed to Member.' : `You’re now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok'); setTimeout(() => { subscribe(); switchView(S.view); }, 0); }
   }, 'board selections');
 
   if (admin) {
@@ -1677,7 +1717,7 @@ function renderBoard() {
       <div class="role-top"><div><h4>${esc(r.name)}</h4><p>${esc(r.desc)}</p></div><span class="seat ${full ? 'full' : 'open'}">${Math.min(taken, r.limit)}/${r.limit} ${full ? 'filled' : 'open'}</span></div>
       <div class="holders">
         ${hs.map(h => `<div class="holder">${avatar(h.name)}<span>${esc(h.name)}</span>${h.id === me ? '<span class="you">You</span>' : ''}</div>`).join('')}
-        ${waiting.map(i => `<div class="holder reserved">${avatar(i.name)}<span>${esc(i.name)}</span><span class="pill-wait">Selected · hasn’t accepted</span></div>`).join('')}
+        ${waiting.map(i => `<div class="holder">${avatar(i.name)}<span>${esc(i.name)}</span></div>`).join('')}
         ${open ? `<div class="holder empty">${plural(open, 'open seat')}</div>` : ''}
       </div>
     </div>`;
@@ -2043,10 +2083,13 @@ const ACTIONS = {
     const r = await modal({ title: `Accept ${inv.role}?`, text: `You were selected for the CJCP UNICEF board as ${inv.role}. Accepting gives you access right away.`, okText: 'Accept role' });
     if (!r.ok) return;
     const batch = db.batch();
-    batch.set(db.collection('boardInvites').doc(inv.id), { role: inv.role, name: inv.name, email: inv.email || '', status: 'accepted', acceptedUid: uid(), acceptedName: myName(), acceptedEmail: S.user.email || '', acceptedAt: FV.serverTimestamp() }, { merge: true });
-    batch.set(vol(uid()), { role: inv.role, roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: 'Board selection' }, { merge: true });
-    S.claims.filter(c => c.uid === uid() && c.status === 'pending').forEach(c => batch.update(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }));
+    batch.set(db.collection('boardInvites').doc(inv.id), { role: inv.role, name: inv.name, email: inv.email || '', status: 'accepted', revoked: false, acceptedUid: uid(), acceptedName: myName(), acceptedEmail: lc(S.user.email), acceptedAt: FV.serverTimestamp() }, { merge: true });
+    batch.set(vol(uid()), { uid: uid(), email: lc(S.user.email), name: myName(), nameLower: myName().toLowerCase(), role: inv.role, roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: 'Board selection' }, { merge: true });
+    S.claims.filter(c => c.uid === uid() && c.status === 'pending').forEach(c => batch.set(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }, { merge: true }));
     await batch.commit();
+    const saved = await vol(uid()).get();
+    if (normRole(saved.data()?.role) !== inv.role) throw appErr('Your role didn’t save. Check your connection and try again, or contact the Secretary.');
+    S.me = { ...(S.me || {}), ...saved.data(), id: uid() };
     logActivity(`${myName()} accepted their board selection as ${inv.role}`);
   },
 
@@ -2073,7 +2116,7 @@ const ACTIONS = {
     if (!inv) return;
     const r = await modal({ title: `Reopen ${inv.name}’s selection?`, text: 'Their account keeps its current role. Change it in the Members table if needed.', okText: 'Reopen' });
     if (!r.ok) return;
-    await db.collection('boardInvites').doc(id).set({ role: inv.role, name: inv.name, email: inv.email || '', status: 'open', acceptedUid: null, acceptedName: null }, { merge: true });
+    await db.collection('boardInvites').doc(id).set({ role: inv.role, name: inv.name, email: inv.email || '', status: 'open', revoked: false, acceptedUid: null, acceptedName: null, acceptedEmail: null }, { merge: true });
     toast('Selection reopened.');
   },
 
@@ -2222,7 +2265,7 @@ const ACTIONS = {
     const batch = db.batch();
     batch.update(db.collection('roleClaims').doc(id), { status: 'approved', reviewedBy: myName(), reviewedAt: FV.serverTimestamp() });
     batch.set(vol(targetDoc), { role: c.role, roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: myName() }, { merge: true });
-    demote.forEach(u => batch.set(vol(u.id), { role: 'Member' }, { merge: true }));
+    demote.forEach(u => { batch.set(vol(u.id), { role: 'Member' }, { merge: true }); revokeInvitesFor(batch, u); });
     S.claims.filter(x => x.uid === c.uid && x.status === 'pending' && x.id !== id).forEach(x => batch.update(db.collection('roleClaims').doc(x.id), { status: 'withdrawn' }));
     await batch.commit();
     logActivity(`${myName()} approved ${c.name} as ${c.role}${demote.length ? ` (replacing ${demote.map(u => u.name).join(', ')})` : ''}`);
@@ -2307,7 +2350,8 @@ async function changeRole(u, next) {
   if (!r.ok) return false;
   const batch = db.batch();
   batch.set(vol(u.id), { role: next, roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: myName() }, { merge: true });
-  demote.forEach(d => batch.set(vol(d.id), { role: 'Member' }, { merge: true }));
+  demote.forEach(d => { batch.set(vol(d.id), { role: 'Member' }, { merge: true }); revokeInvitesFor(batch, d); });
+  if (next === 'Member') revokeInvitesFor(batch, u);
   await batch.commit();
   logActivity(`${myName()} changed ${u.name}’s role to ${next}`);
   toast(`${u.name} is now ${next}.`, 'ok');
