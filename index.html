@@ -1074,7 +1074,16 @@ const canManageEvents = () => isAdmin() || myRole() === 'Events & Outreach';
 const myName = () => S.me?.name || S.user?.displayName || S.user?.email || 'Someone';
 
 const ranked = () => [...S.users].sort((a, b) => (Number(b.totalHours) || 0) - (Number(a.totalHours) || 0) || String(a.name).localeCompare(String(b.name)));
-const holdersOf = role => S.users.filter(u => roleOf(u) === role);
+function holdersOf(role) {
+  const hs = S.users.filter(u => roleOf(u) === role);
+  // The Secretary seat always belongs to the owner, even if their profile is missing an email or hasn't loaded.
+  if (role === 'Secretary' && !hs.some(u => isOwnerEmail(u.email))) {
+    const ownerDoc = isOwnerEmail(S.user?.email) ? (S.users.find(u => u.id === uid() || u.uid === uid()) || S.me) : null;
+    const owner = ownerDoc ? { ...ownerDoc, email: S.user.email } : { id: 'owner', name: OWNER_NAME, email: OWNER_EMAILS[0], role: 'Secretary' };
+    return [owner, ...hs.filter(u => u.id !== owner.id)];
+  }
+  return hs;
+}
 const docIdForUid = u => (S.users.find(x => (x.uid || x.id) === u) || {}).id || u;
 const pendingLogs = () => S.logs.filter(l => l.status === 'pending');
 const pendingClaims = () => S.claims.filter(c => c.status === 'pending');
