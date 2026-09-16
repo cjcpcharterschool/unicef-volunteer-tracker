@@ -238,6 +238,20 @@ main{padding:28px 0 72px}
 .lb-row{display:grid;grid-template-columns:44px 1fr auto auto;gap:14px;align-items:center;padding:12px 22px;border-bottom:1px solid var(--line-2)}
 .lb-row:last-child{border-bottom:0}
 .lb-row.me{background:var(--brand-50)}
+.acc-link{display:block;font-size:12px;color:var(--muted)}
+tr.blocked td{opacity:.65}
+.acc-history{padding:14px 22px 18px;border-top:1px solid var(--line-2)}
+.acc-history h4{margin:0 0 6px;font-size:14px}
+.lb-row.click{cursor:pointer}.lb-row.click:hover{background:var(--line-2)}
+.modal-card:has(.pp){max-width:520px}
+.pp-head{display:flex;gap:12px;align-items:center;margin:6px 0 14px}
+.pp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.pp-stats div{background:var(--line-2);border-radius:12px;padding:10px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.pp-stats strong{font-size:17px}.pp-stats span{font-size:11px;color:var(--ink-2)}
+.pp-list{max-height:260px;overflow:auto}
+.pp-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2);font-size:14px}
+.pp-row small{display:block;color:var(--ink-2);font-size:12px}
+@media (max-width:520px){.pp-stats{grid-template-columns:repeat(2,1fr)}}
 .lb-rank{font-weight:800;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums}
 .lb-who{display:flex;align-items:center;gap:12px;min-width:0}
 .lb-who>div{min-width:0}
@@ -571,6 +585,11 @@ tbody tr:hover{background:#fafcff}
 
       <div class="stats" id="dashStats"></div>
 
+      <div class="card">
+        <div class="card-head"><div><h3>Chapter activity</h3><p>What everyone in the chapter has been up to.</p></div><a class="btn btn-sm btn-ghost" href="#leaderboard">See leaderboard</a></div>
+        <div id="chapterFeed" class="list scroll"></div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
           <div class="card-head"><div><h3>Log volunteer hours</h3><p>The Secretary or an Advisor approves every submission.</p></div></div>
@@ -603,6 +622,8 @@ tbody tr:hover{background:#fafcff}
         <div><h2>Leaderboard</h2><p>Approved volunteer hours across the chapter.</p></div>
         <label class="search"><i data-i="search"></i><input id="lbSearch" type="search" placeholder="Search volunteers"></label>
       </div>
+      <div id="lbNote"></div>
+      <p class="item-meta" style="margin:-6px 0 12px">Tap anyone to see their hours, events and meeting attendance.</p>
       <div id="podium" class="podium"></div>
       <div class="card flush"><div id="lbList"></div></div>
     </section>
@@ -736,6 +757,22 @@ tbody tr:hover{background:#fafcff}
           </table>
         </div>
       </div>
+      <div class="card flush mt hidden" id="accountsCard">
+        <div class="panel-head">
+          <div><h3>Accounts &amp; sign-ins</h3><p id="accSummary">Every account that has signed up. Accounts are never deleted.</p></div>
+          <label class="search"><i data-i="search"></i><input id="accSearch" type="search" placeholder="Search accounts"></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Account</th><th>Signs in with</th><th>Joined</th><th>Last sign-in</th><th>Sign-ins</th><th>Role</th><th></th></tr></thead>
+            <tbody id="accBody"></tbody>
+          </table>
+        </div>
+        <div class="acc-history">
+          <h4>Recent sign-ins</h4>
+          <div id="loginList" class="list scroll"></div>
+        </div>
+      </div>
       <div class="card flush mt">
         <div class="panel-head"><div><h3>Board selections</h3><p>People already chosen for the board. They accept their role when they sign in, with no application.</p></div></div>
         <form id="inviteForm" class="invite-form">
@@ -754,7 +791,7 @@ tbody tr:hover{background:#fafcff}
 
     <!-- Help -->
     <section id="view-help" class="view hidden">
-      <div class="page-head"><div><h2>Help &amp; support</h2><p>Reports go straight to the Secretary's approvals inbox. <span style="opacity:.6">Version 5 (Sept 16)</span></p></div></div>
+      <div class="page-head"><div><h2>Help &amp; support</h2><p>Reports go straight to the Secretary's approvals inbox. <span style="opacity:.6">Version 7 (Sept 16)</span></p></div></div>
       <div class="grid-2">
         <div class="card">
           <div class="card-head"><div><h3>Report an issue</h3><p>Hour disputes, duplicate accounts, bugs or anything else.</p></div></div>
@@ -777,6 +814,10 @@ tbody tr:hover{background:#fafcff}
           <div class="contact-card">
             <div class="stat-ic"><i data-i="mail"></i></div>
             <div><b>Nilakshya Rajora · Secretary</b><a href="mailto:rajoranilakshya@cjcollegeprep.org">rajoranilakshya@cjcollegeprep.org</a></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h3>Connection check</h3><p>Shows whether this account can load chapter data.</p></div></div>
+            <div id="connCheck"></div>
           </div>
           <div class="card">
             <div class="card-head"><div><h3>My reports</h3><p>You'll see the status change here once reviewed.</p></div></div>
@@ -1024,14 +1065,14 @@ function toast(msg, type = 'info') {
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, type === 'error' ? 6000 : 4200);
 }
 
-function modal({ title, text = '', input = null, okText = 'Confirm', danger = false }) {
+function modal({ title, text = '', html = '', input = null, okText = 'Confirm', danger = false, noCancel = false }) {
   return new Promise(resolve => {
     const root = $('#modal');
     const card = document.createElement('div');
     card.className = 'modal-card';
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
-    card.innerHTML = `<h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ''}`;
+    card.innerHTML = `<h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ''}${html}`;
     let field = null;
     if (input) {
       field = document.createElement(input.type === 'textarea' ? 'textarea' : 'input');
@@ -1043,7 +1084,7 @@ function modal({ title, text = '', input = null, okText = 'Confirm', danger = fa
     }
     const actions = document.createElement('div');
     actions.className = 'modal-actions';
-    actions.innerHTML = `<button class="btn btn-ghost" data-m="cancel">Cancel</button><button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-m="ok">${esc(okText)}</button>`;
+    actions.innerHTML = `${noCancel ? '' : '<button class="btn btn-ghost" data-m="cancel">Cancel</button>'}<button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-m="ok">${esc(okText)}</button>`;
     card.appendChild(actions);
     root.innerHTML = '';
     root.appendChild(card);
@@ -1095,7 +1136,7 @@ const vol = id => db.collection('volunteers').doc(id);
 const S = {
   user: null, me: null, started: false,
   users: [], logs: [], claims: [], issues: [], events: [], activity: [],
-  invites: [], meetings: [], meetingId: null, errors: {}, remindedApps: false,
+  invites: [], meetings: [], meetingId: null, errors: {}, remindedApps: false, approved: [], loaded: {}, logins: [],
   unsubs: [], view: 'dashboard', apTab: 'roles', lastRole: null, migrated: false, warned: false,
 };
 let signupInProgress = false;
@@ -1153,7 +1194,7 @@ function isDismissed(id) { try { return localStorage.getItem(dismissedKey(id)) =
 function myInvite() {
   if (!S.user || isOwnerEmail(S.user.email)) return null;
   const role = myRole();
-  return openInvites().find(i => i.role !== role && inviteMatches(i, myName(), S.user.email) && !isDismissed(i.id)) || null;
+  return openInvites().find(i => i.role !== role && !(i.blockedUids || []).includes(uid()) && inviteMatches(i, myName(), S.user.email) && !isDismissed(i.id)) || null;
 }
 function inviteBanner() {
   const inv = myInvite();
@@ -1332,7 +1373,8 @@ async function ensureProfile(user) {
     pending.forEach(p => batch.set(db.collection('hourLogs').doc(), legacyPendingToLog(p, id, base)));
     await batch.commit().catch(err => console.warn('Pending migration failed', err));
   }
-  await Promise.all(legacy.map(d => d.ref.delete().catch(() => d.ref.set({ pendingLogs: [], migratedTo: id }, { merge: true }).catch(() => {}))));
+  // Old profiles are kept forever, just marked as merged into the new one.
+  await Promise.all(legacy.map(d => d.ref.set({ pendingLogs: [], migratedTo: id }, { merge: true }).catch(() => {})));
 
   return { id, ...base };
 }
@@ -1375,6 +1417,12 @@ async function startApp(user) {
     toast(friendly(err), 'error');
     S.me = { id: user.uid, uid: user.uid, name: user.displayName || user.email, email: user.email, role: 'Member', totalHours: 0, eventsAttended: 0 };
   }
+  if (S.me?.blocked && !isOwnerEmail(user.email)) {
+    blockedNotice = 'This account was blocked by the Secretary. If this is a mistake, email rajoranilakshya@cjcollegeprep.org.';
+    await auth.signOut();
+    return;
+  }
+  recordLogin(user);
   $('#auth').classList.add('hidden');
   $('#app').classList.remove('hidden');
   $('#boot').classList.add('hidden');
@@ -1385,14 +1433,30 @@ async function startApp(user) {
   switchView((location.hash || '').slice(1) || 'dashboard');
 }
 
+let blockedNotice = '';
+const providerOf = user => ((user.providerData || [])[0]?.providerId === 'google.com' ? 'Google' : 'Email & password');
+// Every sign-in is saved on the profile and in the sign-in history the Secretary can see.
+async function recordLogin(user) {
+  const email = lc(user.email);
+  const provider = providerOf(user);
+  const name = S.me?.name || user.displayName || email;
+  try {
+    await vol(user.uid).set({ uid: user.uid, email, lastLoginAt: FV.serverTimestamp(), loginCount: FV.increment(1), provider }, { merge: true });
+  } catch (err) { console.warn('Could not update last sign-in', err); }
+  try {
+    await db.collection('logins').add({ uid: user.uid, name, email, provider, at: FV.serverTimestamp(), device: (navigator.userAgent.match(/iPhone|iPad|Android|Chromebook|CrOS|Mac|Windows/) || ['Other'])[0].replace('CrOS', 'Chromebook') });
+  } catch (err) { console.warn('Could not save sign-in history', err); }
+}
+
 function showAuth() {
   S.unsubs.forEach(u => u());
-  Object.assign(S, { user: null, me: null, started: false, users: [], logs: [], claims: [], issues: [], events: [], activity: [], invites: [], meetings: [], meetingId: null, errors: {}, remindedApps: false, unsubs: [], migrated: false, warned: false, lastRole: null });
+  Object.assign(S, { user: null, me: null, started: false, users: [], logs: [], claims: [], issues: [], events: [], activity: [], invites: [], meetings: [], meetingId: null, errors: {}, remindedApps: false, approved: [], loaded: {}, logins: [], unsubs: [], migrated: false, warned: false, lastRole: null });
   $('#toasts').innerHTML = '';
   $('#app').classList.add('hidden');
   $('#auth').classList.remove('hidden');
   $('#boot').classList.add('hidden');
   ['#siPass', '#suPass'].forEach(s => { $(s).value = ''; });
+  if (blockedNotice) { authMsg(blockedNotice); blockedNotice = ''; }
   document.title = 'CJCP UNICEF Tracker';
 }
 
@@ -1400,6 +1464,7 @@ function listen(query, onData, label) {
   let first = true;
   const unsub = query.onSnapshot(snap => {
     if (S.errors[label]) { delete S.errors[label]; }
+    S.loaded[label] = snap.size ?? snap.docs.length;
     onData(snap, first);
     first = false;
     render();
@@ -1426,6 +1491,16 @@ function subscribe() {
     S.users = dedupeUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     const mine = S.users.find(u => u.id === me);
     if (mine) S.me = mine;
+    // If this person's profile is ever missing, save it again so nobody drops off the list.
+    if (!mine && !S.recreating && !snap.metadata?.hasPendingWrites) {
+      S.recreating = true;
+      ensureProfile(S.user).then(p => { S.me = p; }).catch(err => console.warn('Profile re-save failed', err)).finally(() => { S.recreating = false; });
+    }
+    if (mine?.blocked && !isOwnerEmail(S.user?.email)) {
+      blockedNotice = 'This account was blocked by the Secretary. If this is a mistake, email rajoranilakshya@cjcollegeprep.org.';
+      auth.signOut();
+      return;
+    }
     syncMyInviteRole();
     const role = myRole();
     if (role !== S.lastRole) {
@@ -1494,13 +1569,20 @@ function subscribe() {
     if (S.started && role !== S.lastRole) { S.lastRole = role; toast(role === 'Member' ? 'Your board role was changed to Member.' : `You’re now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok'); setTimeout(() => { subscribe(); switchView(S.view); }, 0); }
   }, 'board selections');
 
-  if (admin) {
-    listen(db.collection('activity').orderBy('at', 'desc').limit(60), snap => {
-      S.activity = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    }, 'activity log');
+  // Everyone sees chapter activity and everyone's approved hours, so progress is visible to the whole chapter.
+  listen(db.collection('activity').orderBy('at', 'desc').limit(60), snap => {
+    S.activity = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }, 'activity log');
+  if (roleApprover) {
+    listen(db.collection('logins').orderBy('at', 'desc').limit(100), snap => {
+      S.logins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }, 'sign-in history');
   } else {
-    S.activity = [];
+    S.logins = [];
   }
+  listen(db.collection('hourLogs').where('status', '==', 'approved'), snap => {
+    S.approved = snap.docs.map(d => normLog({ id: d.id, ...d.data() }));
+  }, 'approved hours');
 }
 
 /* ================= NAV & RENDER ================= */
@@ -1596,6 +1678,10 @@ function renderDashboard() {
 
   const legacy = (me.legacyLogs || []).map((l, i) => ({ ...l, id: 'legacy' + i, status: 'approved', legacy: true, submittedAt: l.date }));
   const items = [...mine.filter(l => l.status !== 'withdrawn'), ...legacy].sort((a, b) => ts(b.submittedAt) - ts(a.submittedAt));
+  const feed = S.activity.slice(0, 15);
+  $('#chapterFeed').innerHTML = feed.length ? feed.map(a => `
+    <div class="item"><div class="item-icon">${icon('clock')}</div><div class="item-body"><div class="item-title" style="font-weight:600">${esc(a.action)}</div><div class="item-meta">${timeAgo(a.at)}</div></div></div>`).join('')
+    : empty('users', 'Nothing yet', 'Approved hours, new events and board updates from the whole chapter show up here.');
   $('#myActivity').innerHTML = items.length ? items.map(l => {
     const ic = l.status === 'approved' ? 'check' : l.status === 'rejected' ? 'x' : 'clock';
     const meta = [fmtDate(l.date), `${fmtHours(l.hours)} hrs`, l.reviewedBy ? `by ${esc(l.reviewedBy)}` : (l.approvedBy ? `by ${esc(l.approvedBy)}` : '')].filter(Boolean).join(' · ');
@@ -1658,10 +1744,12 @@ function renderLeaderboard() {
     $('#podium').classList.add('hidden');
   }
 
+  $('#lbNote').innerHTML = !S.errors.members && S.loaded.members != null && S.users.length <= 1
+    ? `<div class="notice bad">${icon('info')}<div>Only your own profile loaded. If other volunteers have signed in, Firebase is blocking this account from seeing them. Open the Help tab and check <b>Connection check</b>.</div></div>` : '';
   const rows = list.map((u, i) => ({ u, rank: i + 1 })).filter(({ u }) => !q || String(u.name).toLowerCase().includes(q));
   $('#lbList').innerHTML = rows.length ? rows.map(({ u, rank }) => {
     const role = roleOf(u);
-    return `<div class="lb-row ${u.id === uid() ? 'me' : ''}">
+    return `<div class="lb-row click ${u.id === uid() ? 'me' : ''}" data-action="viewPerson" data-id="${esc(u.id)}" role="button" tabindex="0" title="See ${esc(u.name)}’s progress">
       <div class="lb-rank">${rank}</div>
       <div class="lb-who">${avatar(u.name)}<div><div class="nm">${esc(u.name)}${u.id === uid() ? ' <span class="you">You</span>' : ''}</div><div class="sub">${role === 'Member' ? plural(Number(u.eventsAttended) || 0, 'event') : esc(role)}</div></div></div>
       <div class="lb-hours">${fmtHours(u.totalHours)} hrs</div>
@@ -1911,12 +1999,48 @@ function renderAdmin() {
   }
 
   renderInvites();
+  renderAccounts();
 
   $('#activityList').innerHTML = S.activity.length ? S.activity.map(a => `
     <div class="item"><div class="item-icon">${icon('clock')}</div><div class="item-body"><div class="item-title" style="font-weight:600">${esc(a.action)}</div><div class="item-meta">${esc(a.by || '')} · ${timeAgo(a.at)}</div></div></div>`).join('')
     : empty('clock', 'No activity yet', 'Actions like approvals and new events are recorded here.');
 }
 
+
+/* ---------- Accounts & sign-ins (Secretary) ---------- */
+function linkedInvites(u) {
+  const key = u.uid || u.id, email = lc(u.email);
+  return (S.invites || []).filter(i => i.status === 'accepted' && (i.acceptedUid === key || (email && lc(i.acceptedEmail) === email)));
+}
+function renderAccounts() {
+  const card = $('#accountsCard');
+  card.classList.toggle('hidden', !canApproveRoles());
+  if (!canApproveRoles()) return;
+  const q = $('#accSearch').value.trim().toLowerCase();
+  const users = [...S.users].sort((a, b) => (b.lastLoginAt ? ts(b.lastLoginAt) : 0) - (a.lastLoginAt ? ts(a.lastLoginAt) : 0) || String(a.name).localeCompare(String(b.name)))
+    .filter(u => !q || [u.name, u.email, u.provider].some(v => lc(v).includes(q)));
+  const signedIn = S.users.filter(u => u.lastLoginAt).length;
+  $('#accSummary').textContent = `${S.users.length} saved accounts · ${signedIn} have signed in since tracking started · ${S.users.filter(u => u.blocked).length} blocked`;
+  $('#accBody').innerHTML = users.length ? users.map(u => {
+    const owner = isOwnerEmail(u.email);
+    const links = linkedInvites(u);
+    return `<tr class="${u.blocked ? 'blocked' : ''}">
+      <td><div class="who">${avatar(u.name)}<div><b>${esc(u.name)}${u.blocked ? ' <span class="chip rejected">Blocked</span>' : ''}</b><span>${esc(u.email || 'no email')}</span></div></div></td>
+      <td>${esc(u.provider || '—')}</td>
+      <td>${u.createdAt ? fmtDate(u.createdAt) : '—'}</td>
+      <td>${u.lastLoginAt ? timeAgo(u.lastLoginAt) : '—'}</td>
+      <td class="num">${Number(u.loginCount) || 0}</td>
+      <td>${esc(roleOf(u))}${links.length ? `<span class="acc-link">accepted ${esc(links.map(i => `${i.role} (${i.name})`).join(', '))}</span>` : ''}</td>
+      <td style="text-align:right;white-space:nowrap">${owner ? '<span class="item-meta">Owner</span>' : `
+        <button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="${esc(u.id)}" title="Remove this account’s board role and reopen any selection it accepted">Unlink</button>
+        <button class="btn btn-sm ${u.blocked ? 'btn-ghost' : 'btn-danger'}" data-action="toggleBlock" data-id="${esc(u.id)}">${u.blocked ? 'Unblock' : 'Block'}</button>`}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7">${empty('search', 'No accounts found', 'Try a different search.')}</td></tr>`;
+
+  $('#loginList').innerHTML = S.logins.length ? S.logins.slice(0, 40).map(l => `
+    <div class="pp-row"><span>${esc(l.name || l.email)}<small>${esc(l.email || '')} · ${esc(l.provider || '')}${l.device ? ' · ' + esc(l.device) : ''}</small></span><b class="item-meta">${timeAgo(l.at)}</b></div>`).join('')
+    : empty('clock', 'No sign-ins recorded yet', 'Every sign-in from now on shows up here.');
+}
 
 /* ---------- Board selections (admin) ---------- */
 function renderInvites() {
@@ -2046,6 +2170,13 @@ function renderAttendancePanel() {
 
 /* ---------- Help ---------- */
 function renderHelp() {
+  const sources = [['members', 'Volunteers & leaderboard'], ['approved hours', 'Approved hours (everyone)'], ['activity log', 'Chapter activity'], ['events', 'Events'], ['meetings', 'Meetings'], ['board selections', 'Board selections']];
+  const bad = sources.filter(([k]) => S.errors[k]);
+  $('#connCheck').innerHTML = `<div class="list">${sources.map(([k, label]) => {
+    const err = S.errors[k], n = S.loaded[k];
+    return `<div class="pp-row"><span>${esc(label)}</span>${err ? `<b style="color:#c0392b">Blocked (${esc(err)})</b>` : n == null ? '<b class="item-meta">Loading…</b>' : `<b style="color:#1a7f4b">OK · ${n}</b>`}</div>`;
+  }).join('')}</div>
+  <p class="item-meta" style="margin-top:10px">${bad.length ? 'Something is blocked. The Secretary needs to paste firestore.rules into Firebase Console → Firestore Database → Rules and click Publish.' : `Signed in as ${esc(S.user?.email || '')}. If everything says OK but you only see yourself, nobody else has signed in to this tracker yet.`}</p>`;
   const mine = S.issues.filter(i => i.uid === uid()).sort((a, b) => ts(b.submittedAt) - ts(a.submittedAt));
   $('#myIssues').innerHTML = mine.length ? mine.map(i => `
     <div class="item"><div class="item-icon ${i.status}">${icon(i.status === 'resolved' ? 'check' : 'flag')}</div>
@@ -2072,10 +2203,78 @@ async function approveLogById(id, { quiet = false } = {}) {
   if (!quiet) toast(`Approved ${fmtHours(log.hours)} hrs for ${log.name}.`, 'ok');
 }
 
+function personProgressHtml(u) {
+  const hrs = Number(u.totalHours) || 0;
+  const tier = tierFor(hrs), next = nextTier(hrs);
+  const key = u.uid || u.id;
+  const pool = new Map([...S.approved, ...S.logs.filter(l => l.status === 'approved')].map(l => [l.id, l]));
+  const logs = [...pool.values()].filter(l => l.uid === key).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const all = [...logs, ...(u.legacyLogs || [])];
+  const att = attendanceOf(u);
+  const rank = ranked().findIndex(x => x.id === u.id) + 1;
+  return `<div class="pp">
+    <div class="pp-head">${avatar(u.name)}<div><b>${esc(u.name)}</b><div class="item-meta">${esc(roleOf(u))}${rank ? ` · #${rank} on the leaderboard` : ''}</div></div></div>
+    <div class="pp-stats">
+      <div><strong>${fmtHours(hrs)}</strong><span>hours</span></div>
+      <div><strong>${Number(u.eventsAttended) || 0}</strong><span>events</span></div>
+      <div><strong>${rateText(att)}</strong><span>meetings</span></div>
+      <div><strong style="color:${tier.color}">${esc(tier.name)}</strong><span>${next ? `${fmtHours(next.min - hrs)} to ${esc(next.name)}` : 'top award'}</span></div>
+    </div>
+    <div class="pp-list">${all.length ? all.slice(0, 25).map(l => `<div class="pp-row"><span>${esc(l.event || 'Volunteer activity')}<small>${l.date ? esc(fmtDate(l.date)) : ''}</small></span><b>${fmtHours(l.hours)} hrs</b></div>`).join('') : '<p class="item-meta">No approved hours yet.</p>'}</div>
+  </div>`;
+}
+
 const ACTIONS = {
+  unlinkAccount: async id => {
+    if (!canApproveRoles()) throw appErr('Only the Secretary can unlink accounts.');
+    const u = S.users.find(x => x.id === id);
+    if (!u || isOwnerEmail(u.email)) return;
+    const key = u.uid || u.id;
+    const links = linkedInvites(u);
+    const r = await modal({
+      title: `Unlink ${u.name}?`,
+      text: `Use this if this account took someone else’s spot. ${u.name} goes back to Member${links.length ? `, and the ${links.map(i => i.role).join(', ')} selection for ${links.map(i => i.name).join(', ')} reopens so the right person can accept it. This account can’t accept that selection again` : ''}. Their hours and profile stay saved.`,
+      okText: 'Unlink account', danger: true,
+    });
+    if (!r.ok) return;
+    const batch = db.batch();
+    batch.set(vol(u.id), { role: 'Member', unlinkedAt: FV.serverTimestamp(), unlinkedBy: myName() }, { merge: true });
+    links.forEach(i => batch.set(db.collection('boardInvites').doc(i.id), {
+      role: i.role, name: i.name, status: 'open', revoked: false, acceptedUid: null, acceptedName: null, acceptedEmail: null,
+      blockedUids: [...new Set([...(i.blockedUids || []), key])],
+    }, { merge: true }));
+    S.claims.filter(c => c.uid === key && c.status === 'pending').forEach(c => batch.set(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }, { merge: true }));
+    await batch.commit();
+    logActivity(`${myName()} unlinked ${u.name}’s account${links.length ? ` from ${links.map(i => `${i.role} (${i.name})`).join(', ')}` : ''}`);
+    toast(`${u.name} was unlinked.`, 'ok');
+  },
+
+  toggleBlock: async id => {
+    if (!canApproveRoles()) throw appErr('Only the Secretary can block accounts.');
+    const u = S.users.find(x => x.id === id);
+    if (!u || isOwnerEmail(u.email)) return;
+    const next = !u.blocked;
+    const r = await modal({
+      title: next ? `Block ${u.name}?` : `Unblock ${u.name}?`,
+      text: next ? 'They’re signed out and can’t use the tracker until you unblock them. Their profile and hours stay saved.' : 'They can sign in and use the tracker again.',
+      okText: next ? 'Block account' : 'Unblock', danger: next,
+    });
+    if (!r.ok) return;
+    const patch = next ? { blocked: true, role: 'Member', blockedAt: FV.serverTimestamp(), blockedBy: myName() } : { blocked: false };
+    await vol(u.id).set(patch, { merge: true });
+    logActivity(`${myName()} ${next ? 'blocked' : 'unblocked'} ${u.name}’s account`);
+    toast(`${u.name} was ${next ? 'blocked' : 'unblocked'}.`, 'ok');
+  },
+
+  viewPerson: async id => {
+    const u = S.users.find(x => x.id === id);
+    if (!u) return;
+    await modal({ title: 'Volunteer progress', html: personProgressHtml(u), okText: 'Close', noCancel: true });
+  },
   acceptInvite: async id => {
     const inv = allInvites().find(i => i.id === id);
     if (!inv) throw appErr('That selection no longer exists.');
+    if ((inv.blockedUids || []).includes(uid())) throw appErr('The Secretary unlinked this account from that board selection. Contact the Secretary.');
     if (!inviteMatches(inv, myName(), S.user.email)) throw appErr('This board selection isn’t for your account. Contact the Secretary.');
     if (inv.status === 'accepted' && inv.acceptedUid && inv.acceptedUid !== uid()) throw appErr('Another account already accepted this role. Contact the Secretary.');
     const def = ROLES.find(r => r.name === inv.role);
@@ -2331,7 +2530,7 @@ const ACTIONS = {
     logActivity(`${myName()} exported volunteer data`);
   },
 };
-const NO_BUSY = new Set(['apTab', 'logFor', 'exportCsv', 'exportMeeting', 'openMeeting', 'closeMeeting', 'dismissInvite', 'mark']);
+const NO_BUSY = new Set(['viewPerson', 'apTab', 'logFor', 'exportCsv', 'exportMeeting', 'openMeeting', 'closeMeeting', 'dismissInvite', 'mark']);
 function downloadCsv(text, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
@@ -2387,6 +2586,7 @@ function bindApp() {
 
   $('#lbSearch').addEventListener('input', renderLeaderboard);
   $('#memSearch').addEventListener('input', renderAdmin);
+  $('#accSearch').addEventListener('input', renderAccounts);
 
   $('#hEvent').addEventListener('change', () => {
     const v = $('#hEvent').value;
