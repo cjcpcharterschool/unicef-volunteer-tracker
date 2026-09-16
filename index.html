@@ -825,7 +825,6 @@ const OWNER_NAME = 'Nilakshya Rajora';
 const BOARD_ROSTER = [
   ['President', 'Aarav Shah'],
   ['Vice President', 'Suhana Suthar'],
-  ['Secretary', 'Nilakshya Rajora'],
   ['Treasurer', 'Zachary Ovwori'],
   ['Social Media', 'Padmini Shekhawat'],
   ['Social Media', 'Tharini Kondaveti'],
@@ -1089,7 +1088,8 @@ function allInvites() {
     return stored.get(id) || { id, role, name, email: '', status: 'open', isDefault: true };
   });
   S.invites.forEach(i => { if (!list.some(x => x.id === i.id)) list.push(i); });
-  return list.filter(i => i.status !== 'removed' && i.name && i.role).map(i => ({ ...i, role: normRole(i.role), email: i.email || '' }));
+  // The Secretary seat belongs to the owner account automatically, so it never shows as a pending selection.
+  return list.filter(i => i.status !== 'removed' && i.name && i.role && normRole(i.role) !== 'Secretary').map(i => ({ ...i, role: normRole(i.role), email: i.email || '' }));
 }
 const inviteHolder = inv => {
   if (inv.status === 'accepted' && inv.acceptedUid) return S.users.find(u => (u.uid || u.id) === inv.acceptedUid) || { name: inv.acceptedName || inv.name };
