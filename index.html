@@ -1065,7 +1065,7 @@ function toast(msg, type = 'info') {
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, type === 'error' ? 6000 : 4200);
 }
 
-function modal({ title, text = '', html = '', input = null, okText = 'Confirm', danger = false, noCancel = false }) {
+function modal({ title, text = '', html = '', input = null, okText = 'Confirm', danger = false, noCancel = false, confirm = null }) {
   return new Promise(resolve => {
     const root = $('#modal');
     const card = document.createElement('div');
@@ -1082,14 +1082,34 @@ function modal({ title, text = '', html = '', input = null, okText = 'Confirm', 
       if (input.value != null) field.value = input.value;
       card.appendChild(field);
     }
+    let confirmField = null;
+    if (confirm) {
+      const label = document.createElement('p');
+      label.style.cssText = 'margin:12px 0 4px;font-size:.85rem;color:var(--fg2)';
+      label.textContent = `Type "${confirm}" to confirm:`;
+      card.appendChild(label);
+      confirmField = document.createElement('input');
+      confirmField.type = 'text';
+      confirmField.placeholder = confirm;
+      confirmField.style.cssText = 'width:100%;box-sizing:border-box';
+      card.appendChild(confirmField);
+    }
     const actions = document.createElement('div');
     actions.className = 'modal-actions';
-    actions.innerHTML = `${noCancel ? '' : '<button class="btn btn-ghost" data-m="cancel">Cancel</button>'}<button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-m="ok">${esc(okText)}</button>`;
+    actions.innerHTML = `${noCancel ? '' : '<button class="btn btn-ghost" data-m="cancel">Cancel</button>'}<button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-m="ok"${confirm ? ' disabled' : ''}>${esc(okText)}</button>`;
     card.appendChild(actions);
     root.innerHTML = '';
     root.appendChild(card);
     root.classList.add('open');
-    setTimeout(() => (field || actions.lastChild).focus(), 60);
+    const okBtn = actions.querySelector('[data-m="ok"]');
+    if (confirmField) {
+      confirmField.addEventListener('input', () => {
+        okBtn.disabled = confirmField.value.trim() !== confirm;
+      });
+      setTimeout(() => confirmField.focus(), 60);
+    } else {
+      setTimeout(() => (field || okBtn).focus(), 60);
+    }
 
     const done = ok => {
       root.classList.remove('open');
@@ -1099,13 +1119,13 @@ function modal({ title, text = '', html = '', input = null, okText = 'Confirm', 
     };
     const onKey = e => {
       if (e.key === 'Escape') done(false);
-      if (e.key === 'Enter' && (!field || field.tagName === 'INPUT')) { e.preventDefault(); done(true); }
+      if (e.key === 'Enter' && (!field || field.tagName === 'INPUT') && !okBtn.disabled) { e.preventDefault(); done(true); }
     };
     document.addEventListener('keydown', onKey);
     root.onclick = e => {
       if (e.target === root) return done(false);
       const b = e.target.closest('[data-m]');
-      if (b) done(b.dataset.m === 'ok');
+      if (b && !(b.dataset.m === 'ok' && okBtn.disabled)) done(b.dataset.m === 'ok');
     };
   });
 }
@@ -2033,7 +2053,8 @@ function renderAccounts() {
       <td>${esc(roleOf(u))}${links.length ? `<span class="acc-link">accepted ${esc(links.map(i => `${i.role} (${i.name})`).join(', '))}</span>` : ''}</td>
       <td style="text-align:right;white-space:nowrap">${owner ? '<span class="item-meta">Owner</span>' : `
         <button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="${esc(u.id)}" title="Remove this account’s board role and reopen any selection it accepted">Unlink</button>
-        <button class="btn btn-sm ${u.blocked ? 'btn-ghost' : 'btn-danger'}" data-action="toggleBlock" data-id="${esc(u.id)}">${u.blocked ? 'Unblock' : 'Block'}</button>`}</td>
+        <button class="btn btn-sm ${u.blocked ? ‘btn-ghost’ : ‘btn-danger’}" data-action="toggleBlock" data-id="${esc(u.id)}">${u.blocked ? ‘Unblock’ : ‘Block’}</button>
+        <button class="btn btn-sm btn-danger" data-action="deleteAccount" data-id="${esc(u.id)}" title="Permanently delete this account and all its data">Delete</button>`}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7">${empty('search', 'No accounts found', 'Try a different search.')}</td></tr>`;
 
@@ -2247,6 +2268,40 @@ const ACTIONS = {
     await batch.commit();
     logActivity(`${myName()} unlinked ${u.name}’s account${links.length ? ` from ${links.map(i => `${i.role} (${i.name})`).join(', ')}` : ''}`);
     toast(`${u.name} was unlinked.`, 'ok');
+  },
+
+  deleteAccount: async id => {
+    if (!canApproveRoles()) throw appErr('Only the Secretary can delete accounts.');
+    const u = S.users.find(x => x.id === id);
+    if (!u || isOwnerEmail(u.email)) return;
+    const r = await modal({
+      title: `Permanently delete ${u.name}?`,
+      text: `This will remove ${u.name}'s profile, all their hour logs, and any board selections linked to them. This cannot be undone. Type their name to confirm.`,
+      okText: 'Delete permanently', danger: true,
+      confirm: u.name,
+    });
+    if (!r.ok) return;
+    const key = u.uid || u.id;
+    const batch = db.batch();
+    // Remove volunteer profile
+    batch.delete(vol(u.id));
+    // Reopen any accepted board selections
+    const links = linkedInvites(u);
+    links.forEach(i => batch.set(db.collection('boardInvites').doc(i.id), {
+      role: i.role, name: i.name, status: 'open', revoked: false,
+      acceptedUid: null, acceptedName: null, acceptedEmail: null, blockedUids: [],
+    }, { merge: true }));
+    // Withdraw any pending role claims
+    S.claims.filter(c => c.uid === key && c.status === 'pending').forEach(c =>
+      batch.set(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }, { merge: true }));
+    await batch.commit();
+    // Delete their hour logs separately (may be many)
+    const logsSnap = await db.collection('hourLogs').where('uid', '==', key).get();
+    const logBatch = db.batch();
+    logsSnap.docs.forEach(d => logBatch.delete(d.ref));
+    if (logsSnap.docs.length) await logBatch.commit();
+    logActivity(`${myName()} permanently deleted ${u.name}'s account`);
+    toast(`${u.name}'s account was deleted.`, 'ok');
   },
 
   toggleBlock: async id => {
