@@ -863,7 +863,7 @@ const OWNER_EMAILS = ['rajoranilakshya@cjcollegeprep.org'];
 const OWNER_NAME = 'Nilakshya Rajora';
 
 // People already chosen for the board. They never apply. When they sign in they see
-// "You've been selected" and accept the role with one click. The Secretary can add an
+// "You\'ve been selected" and accept the role with one click. The Secretary can add an
 // email to any selection (Admin > Board selections) so it matches only that account.
 const BOARD_ROSTER = [
   ['President', 'Aarav Shah'],
@@ -1031,7 +1031,7 @@ function statCard(label, value, sub, ic, tone = '') {
 function friendly(err) {
   const code = err?.code || '';
   const map = {
-    'auth/invalid-email': 'That email address doesn’t look right.',
+    'auth/invalid-email': 'That email address doesn\'t look right.',
     'auth/missing-email': 'Enter your email address.',
     'auth/user-not-found': 'No account uses that email. Create one instead.',
     'auth/wrong-password': 'Incorrect password.',
@@ -1046,10 +1046,10 @@ function friendly(err) {
     'auth/popup-blocked': 'Your browser blocked the Google window. Allow pop-ups and try again.',
     'auth/too-many-requests': 'Too many attempts. Wait a minute and try again.',
     'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/operation-not-allowed': 'This sign-in method isn’t turned on in Firebase Authentication.',
-    'auth/unauthorized-domain': 'This site isn’t an authorized domain in Firebase Authentication settings.',
+    'auth/operation-not-allowed': 'This sign-in method isn\'t turned on in Firebase Authentication.',
+    'auth/unauthorized-domain': 'This site isn\'t an authorized domain in Firebase Authentication settings.',
     'permission-denied': 'Permission denied. Check the Firestore security rules.',
-    'unavailable': 'Can’t reach the database. Check your connection.',
+    'unavailable': 'Can\'t reach the database. Check your connection.',
   };
   if (code in map) return map[code];
   return err?.message || 'Something went wrong. Try again.';
@@ -1147,7 +1147,7 @@ try {
   FV = firebase.firestore.FieldValue;
 } catch (err) {
   console.error(err);
-  $('#bootMsg').textContent = 'Couldn’t load Firebase. Check your internet connection and refresh the page.';
+  $('#bootMsg').textContent = 'Couldn\'t load Firebase. Check your internet connection and refresh the page.';
   $('.spinner').classList.add('hidden');
 }
 const vol = id => db.collection('volunteers').doc(id);
@@ -1221,7 +1221,7 @@ function inviteBanner() {
   if (!inv) return '';
   return `<div class="invite">
     <div class="invite-ic">${icon('award')}</div>
-    <div class="invite-text"><div class="tag">Board selection</div><h3>You’ve been selected as ${esc(inv.role)}</h3><p>No application needed. Accept to take your seat and unlock your ${esc(inv.role)} tools.</p></div>
+    <div class="invite-text"><div class="tag">Board selection</div><h3>You\'ve been selected as ${esc(inv.role)}</h3><p>No application needed. Accept to take your seat and unlock your ${esc(inv.role)} tools.</p></div>
     <div class="invite-actions"><button class="btn btn-sm btn-ghost" data-action="dismissInvite" data-id="${esc(inv.id)}">Not me</button><button class="btn btn-primary" data-action="acceptInvite" data-id="${esc(inv.id)}">${icon('check')}Accept role</button></div>
   </div>`;
 }
@@ -1285,7 +1285,7 @@ function bindAuth() {
 
   $('#forgotBtn').addEventListener('click', async () => {
     const email = $('#siEmail').value.trim();
-    if (!email) return authMsg('Type your email above, then click “Forgot password?” again.');
+    if (!email) return authMsg('Type your email above, then click "Forgot password?" again.');
     try { await auth.sendPasswordResetEmail(email); authMsg(`Password reset link sent to ${email}.`, 'ok'); }
     catch (err) { authMsg(friendly(err)); }
   });
@@ -1311,7 +1311,7 @@ function bindAuth() {
         if (taken) {
           await cred.user.delete().catch(() => auth.signOut());
           signupInProgress = false;
-          return authMsg(`“${name}” is already registered. Add a middle initial, or sign in if that’s you.`);
+          return authMsg(`"${name}" is already registered. Add a middle initial, or sign in if that\'s you.`);
         }
         await cred.user.updateProfile({ displayName: name });
         signupInProgress = false;
@@ -1491,7 +1491,7 @@ function listen(query, onData, label) {
   }, err => {
     console.error(label, err);
     S.errors[label] = err.code || err.message || 'error';
-    if (!S.warned) { S.warned = true; toast(`Couldn’t load ${label}: ${friendly(err)}`, 'error'); }
+    if (!S.warned) { S.warned = true; toast(`Couldn't load ${label}: ${friendly(err)}`, 'error'); }
     render();
   });
   S.unsubs.push(unsub);
@@ -1525,7 +1525,7 @@ function subscribe() {
     const role = myRole();
     if (role !== S.lastRole) {
       S.lastRole = role;
-      toast(role === 'Member' ? 'Your board role was changed to Member.' : `You’re now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok');
+      toast(role === 'Member' ? 'Your board role was changed to Member.' : `You're now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok');
       setTimeout(() => { subscribe(); switchView(S.view); }, 0);
       return;
     }
@@ -1586,7 +1586,7 @@ function subscribe() {
     S.invites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     syncMyInviteRole();
     const role = myRole();
-    if (S.started && role !== S.lastRole) { S.lastRole = role; toast(role === 'Member' ? 'Your board role was changed to Member.' : `You’re now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok'); setTimeout(() => { subscribe(); switchView(S.view); }, 0); }
+    if (S.started && role !== S.lastRole) { S.lastRole = role; toast(role === 'Member' ? 'Your board role was changed to Member.' : `You're now ${role}! New tools unlocked.`, role === 'Member' ? 'info' : 'ok'); setTimeout(() => { subscribe(); switchView(S.view); }, 0); }
   }, 'board selections');
 
   // Everyone sees chapter activity and everyone's approved hours, so progress is visible to the whole chapter.
@@ -1653,8 +1653,8 @@ function renderShell() {
   const failed = Object.keys(S.errors);
   const denied = failed.some(k => S.errors[k] === 'permission-denied');
   $('#alerts').innerHTML = failed.length ? `<div class="notice bad alert-banner">${icon('info')}<div class="grow">
-    <b>The tracker can’t load ${esc(failed.join(', '))} from Firebase${denied ? ' (permission denied)' : ''}.</b>
-    ${denied ? 'Until this is fixed, applications, hours and reports won’t reach the Secretary. Open the Firebase Console → Firestore Database → Rules, paste in the firestore.rules file, and click Publish. Then refresh this page.' : 'Check your internet connection, then refresh this page.'}
+    <b>The tracker can\'t load ${esc(failed.join(', '))} from Firebase${denied ? ' (permission denied)' : ''}.</b>
+    ${denied ? 'Until this is fixed, applications, hours and reports won\'t reach the Secretary. Open the Firebase Console → Firestore Database → Rules, paste in the firestore.rules file, and click Publish. Then refresh this page.' : 'Check your internet connection, then refresh this page.'}
   </div></div>` : '';
 }
 
@@ -1769,7 +1769,7 @@ function renderLeaderboard() {
   const rows = list.map((u, i) => ({ u, rank: i + 1 })).filter(({ u }) => !q || String(u.name).toLowerCase().includes(q));
   $('#lbList').innerHTML = rows.length ? rows.map(({ u, rank }) => {
     const role = roleOf(u);
-    return `<div class="lb-row click ${u.id === uid() ? 'me' : ''}" data-action="viewPerson" data-id="${esc(u.id)}" role="button" tabindex="0" title="See ${esc(u.name)}’s progress">
+    return `<div class="lb-row click ${u.id === uid() ? 'me' : ''}" data-action="viewPerson" data-id="${esc(u.id)}" role="button" tabindex="0" title="See ${esc(u.name)}'s progress">
       <div class="lb-rank">${rank}</div>
       <div class="lb-who">${avatar(u.name)}<div><div class="nm">${esc(u.name)}${u.id === uid() ? ' <span class="you">You</span>' : ''}</div><div class="sub">${role === 'Member' ? plural(Number(u.eventsAttended) || 0, 'event') : esc(role)}</div></div></div>
       <div class="lb-hours">${fmtHours(u.totalHours)} hrs</div>
@@ -1834,9 +1834,9 @@ function renderBoard() {
   const inv = myInvite();
   const myPending = S.claims.find(c => c.uid === me && c.status === 'pending');
   let box;
-  if (owner) box = `<div class="notice ok">${icon('shield')}<div class="grow">You’re signed in as the chapter owner, so you’re always <b>Secretary</b>. Applications from members land below and on the Approvals tab.</div></div>`;
+  if (owner) box = `<div class="notice ok">${icon('shield')}<div class="grow">You're signed in as the chapter owner, so you're always <b>Secretary</b>. Applications from members land below and on the Approvals tab.</div></div>`;
   else if (inv) box = `<div class="notice ok">${icon('award')}<div class="grow">You were selected as <b>${esc(inv.role)}</b>. No application needed. Use the <b>Accept role</b> button above.</div></div>`;
-  else if (role === 'Member') box = `<div class="notice info">${icon('info')}<div class="grow">You’re a <b>Member</b>. Apply below for an open seat.</div></div>`;
+  else if (role === 'Member') box = `<div class="notice info">${icon('info')}<div class="grow">You're a <b>Member</b>. Apply below for an open seat.</div></div>`;
   else box = `<div class="notice ok">${icon('shield')}<div class="grow">You hold <b>${esc(role)}</b>. You can apply to switch roles.</div></div>`;
   if (myPending && !owner) {
     box += `<div class="notice warn">${icon('clock')}<div class="grow">Your application for <b>${esc(myPending.role)}</b> was delivered to the Secretary and is waiting for review.<br><button class="link-btn" data-action="withdrawClaim" data-id="${esc(myPending.id)}">Withdraw application</button></div></div>`;
@@ -1859,7 +1859,7 @@ function renderBoard() {
     $('#myClaims').innerHTML = pc.length ? `<div class="list">${pc.map(c => `
       <div class="item">${avatar(c.name)}<div class="item-body"><div class="item-title">${esc(c.name)}</div><div class="item-meta">wants <b>${esc(c.role)}</b> · ${timeAgo(c.submittedAt)}</div>${c.message ? `<div class="item-note">${esc(c.message)}</div>` : ''}
         <div class="event-actions"><button class="btn btn-sm btn-soft-bad" data-action="rejectClaim" data-id="${esc(c.id)}">Reject</button><button class="btn btn-sm btn-ok" data-action="approveClaim" data-id="${esc(c.id)}">${icon('check')}Approve</button></div></div></div>`).join('')}</div>`
-      : empty('users', 'No applications waiting', 'New applications show up here the moment they’re sent.');
+      : empty('users', 'No applications waiting', 'New applications show up here the moment they\'re sent.');
     return;
   }
   const history = S.claims.filter(c => c.uid === me && c.status !== 'pending').sort((a, b) => ts(b.submittedAt) - ts(a.submittedAt));
@@ -2044,6 +2044,10 @@ function renderAccounts() {
   $('#accBody').innerHTML = users.length ? users.map(u => {
     const owner = isOwnerEmail(u.email);
     const links = linkedInvites(u);
+    const accBtns = owner ? '<span class="item-meta">Owner</span>'
+      : '<button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="' + esc(u.id) + '">Unlink</button>'
+      + '<button class="btn btn-sm ' + (u.blocked ? 'btn-ghost' : 'btn-danger') + '" data-action="toggleBlock" data-id="' + esc(u.id) + '">' + (u.blocked ? 'Unblock' : 'Block') + '</button>'
+      + '<button class="btn btn-sm btn-danger" data-action="deleteAccount" data-id="' + esc(u.id) + '">Delete</button>';
     return `<tr class="${u.blocked ? 'blocked' : ''}">
       <td><div class="who">${avatar(u.name)}<div><b>${esc(u.name)}${u.blocked ? ' <span class="chip rejected">Blocked</span>' : ''}</b><span>${esc(u.email || 'no email')}</span></div></div></td>
       <td>${esc(u.provider || '—')}</td>
@@ -2051,10 +2055,7 @@ function renderAccounts() {
       <td>${u.lastLoginAt ? timeAgo(u.lastLoginAt) : '—'}</td>
       <td class="num">${Number(u.loginCount) || 0}</td>
       <td>${esc(roleOf(u))}${links.length ? `<span class="acc-link">accepted ${esc(links.map(i => `${i.role} (${i.name})`).join(', '))}</span>` : ''}</td>
-      <td style="text-align:right;white-space:nowrap">${owner ? '<span class="item-meta">Owner</span>' : `
-        <button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="${esc(u.id)}" title="Remove this account’s board role and reopen any selection it accepted">Unlink</button>
-        <button class="btn btn-sm ${u.blocked ? ‘btn-ghost’ : ‘btn-danger’}" data-action="toggleBlock" data-id="${esc(u.id)}">${u.blocked ? ‘Unblock’ : ‘Block’}</button>
-        <button class="btn btn-sm btn-danger" data-action="deleteAccount" data-id="${esc(u.id)}" title="Permanently delete this account and all its data">Delete</button>`}</td>
+      <td style="text-align:right;white-space:nowrap">${accBtns}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7">${empty('search', 'No accounts found', 'Try a different search.')}</td></tr>`;
 
@@ -2124,7 +2125,7 @@ function renderMeetings() {
   if (box.dataset.sig !== sig) {
     box.dataset.sig = sig;
     box.innerHTML = open.map(m => m.attendance?.[me]?.status === 'present'
-      ? `<div class="notice ok">${icon('check')}<div class="grow">You’re checked in to <b>${esc(m.title)}</b> (${fmtDate(m.date)}).</div></div>`
+      ? `<div class="notice ok">${icon('check')}<div class="grow">You're checked in to <b>${esc(m.title)}</b> (${fmtDate(m.date)}).</div></div>`
       : `<div class="checkin">
           <div class="checkin-text"><div class="tag">Check-in is open</div><h3>${esc(m.title)}</h3><p>${fmtDate(m.date, { weekday: 'long', month: 'short', day: 'numeric' })}${m.time ? ' · ' + esc(m.time) : ''}. Enter the code shown at the meeting.</p></div>
           <form class="checkin-form" data-meeting="${esc(m.id)}"><input class="code-input" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Check-in code"><button class="btn btn-primary" type="submit">${icon('check')}Check in</button></form>
@@ -2254,7 +2255,7 @@ const ACTIONS = {
     const links = linkedInvites(u);
     const r = await modal({
       title: `Unlink ${u.name}?`,
-      text: `Use this if this account took someone else’s spot. ${u.name} goes back to Member${links.length ? `, and the ${links.map(i => i.role).join(', ')} selection for ${links.map(i => i.name).join(', ')} reopens so the right person can accept it. This account can’t accept that selection again` : ''}. Their hours and profile stay saved.`,
+      text: `Use this if this account took someone else's spot. ${u.name} goes back to Member${links.length ? `, and the ${links.map(i => i.role).join(', ')} selection for ${links.map(i => i.name).join(', ')} reopens so the right person can accept it. This account can't accept that selection again` : ''}. Their hours and profile stay saved.`,
       okText: 'Unlink account', danger: true,
     });
     if (!r.ok) return;
@@ -2266,7 +2267,7 @@ const ACTIONS = {
     }, { merge: true }));
     S.claims.filter(c => c.uid === key && c.status === 'pending').forEach(c => batch.set(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }, { merge: true }));
     await batch.commit();
-    logActivity(`${myName()} unlinked ${u.name}’s account${links.length ? ` from ${links.map(i => `${i.role} (${i.name})`).join(', ')}` : ''}`);
+    logActivity(`${myName()} unlinked ${u.name}'s account${links.length ? ` from ${links.map(i => `${i.role} (${i.name})`).join(', ')}` : ''}`);
     toast(`${u.name} was unlinked.`, 'ok');
   },
 
@@ -2311,13 +2312,13 @@ const ACTIONS = {
     const next = !u.blocked;
     const r = await modal({
       title: next ? `Block ${u.name}?` : `Unblock ${u.name}?`,
-      text: next ? 'They’re signed out and can’t use the tracker until you unblock them. Their profile and hours stay saved.' : 'They can sign in and use the tracker again.',
+      text: next ? 'They are signed out and cannot use the tracker until you unblock them. Their profile and hours stay saved.' : 'They can sign in and use the tracker again.',
       okText: next ? 'Block account' : 'Unblock', danger: next,
     });
     if (!r.ok) return;
     const patch = next ? { blocked: true, role: 'Member', blockedAt: FV.serverTimestamp(), blockedBy: myName() } : { blocked: false };
     await vol(u.id).set(patch, { merge: true });
-    logActivity(`${myName()} ${next ? 'blocked' : 'unblocked'} ${u.name}’s account`);
+    logActivity(`${myName()} ${next ? 'blocked' : 'unblocked'} ${u.name}'s account`);
     toast(`${u.name} was ${next ? 'blocked' : 'unblocked'}.`, 'ok');
   },
 
@@ -2330,7 +2331,7 @@ const ACTIONS = {
     const inv = allInvites().find(i => i.id === id);
     if (!inv) throw appErr('That selection no longer exists.');
     if ((inv.blockedUids || []).includes(uid())) throw appErr('The Secretary unlinked this account from that board selection. Contact the Secretary.');
-    if (!inviteMatches(inv, myName(), S.user.email)) throw appErr('This board selection isn’t for your account. Contact the Secretary.');
+    if (!inviteMatches(inv, myName(), S.user.email)) throw appErr('This board selection isn\'t for your account. Contact the Secretary.');
     if (inv.status === 'accepted' && inv.acceptedUid && inv.acceptedUid !== uid()) throw appErr('Another account already accepted this role. Contact the Secretary.');
     const def = ROLES.find(r => r.name === inv.role);
     if (def && holdersOf(inv.role).filter(u => u.id !== uid()).length >= def.limit) throw appErr(`${inv.role} is already full. Contact the Secretary.`);
@@ -2342,7 +2343,7 @@ const ACTIONS = {
     S.claims.filter(c => c.uid === uid() && c.status === 'pending').forEach(c => batch.set(db.collection('roleClaims').doc(c.id), { status: 'withdrawn' }, { merge: true }));
     await batch.commit();
     const saved = await vol(uid()).get();
-    if (normRole(saved.data()?.role) !== inv.role) throw appErr('Your role didn’t save. Check your connection and try again, or contact the Secretary.');
+    if (normRole(saved.data()?.role) !== inv.role) throw appErr('Your role didn\'t save. Check your connection and try again, or contact the Secretary.');
     S.me = { ...(S.me || {}), ...saved.data(), id: uid() };
     logActivity(`${myName()} accepted their board selection as ${inv.role}`);
   },
@@ -2356,19 +2357,19 @@ const ACTIONS = {
   inviteEmail: async id => {
     const inv = allInvites().find(i => i.id === id);
     if (!inv) return;
-    const r = await modal({ title: `Lock ${inv.name}’s selection to an email`, text: 'Only an account with this email will see “Accept role”. Leave blank to match by name again.', input: { type: 'email', placeholder: 'name@cjcollegeprep.org', value: inv.email }, okText: 'Save' });
+    const r = await modal({ title: `Lock ${inv.name}'s selection to an email`, text: 'Only an account with this email will see "Accept role". Leave blank to match by name again.', input: { type: 'email', placeholder: 'name@cjcollegeprep.org', value: inv.email }, okText: 'Save' });
     if (!r.ok) return;
     const email = r.value.toLowerCase();
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw appErr('That email address doesn’t look right.');
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw appErr('That email address doesn\'t look right.');
     await db.collection('boardInvites').doc(id).set({ role: inv.role, name: inv.name, email, status: inv.status || 'open' }, { merge: true });
-    logActivity(`${myName()} ${email ? `locked ${inv.name}’s selection to ${email}` : `cleared the email on ${inv.name}’s selection`}`);
+    logActivity(`${myName()} ${email ? `locked ${inv.name}'s selection to ${email}` : `cleared the email on ${inv.name}'s selection`}`);
     toast('Selection updated.', 'ok');
   },
 
   inviteReset: async id => {
     const inv = allInvites().find(i => i.id === id);
     if (!inv) return;
-    const r = await modal({ title: `Reopen ${inv.name}’s selection?`, text: 'Their account keeps its current role. Change it in the Members table if needed.', okText: 'Reopen' });
+    const r = await modal({ title: `Reopen ${inv.name}'s selection?`, text: 'Their account keeps its current role. Change it in the Members table if needed.', okText: 'Reopen' });
     if (!r.ok) return;
     await db.collection('boardInvites').doc(id).set({ role: inv.role, name: inv.name, email: inv.email || '', status: 'open', revoked: false, acceptedUid: null, acceptedName: null, acceptedEmail: null }, { merge: true });
     toast('Selection reopened.');
@@ -2380,7 +2381,7 @@ const ACTIONS = {
     const r = await modal({ title: `Remove ${inv.name} as selected ${inv.role}?`, text: 'Their seat opens for applications. Anyone already in the role keeps it.', okText: 'Remove', danger: true });
     if (!r.ok) return;
     await db.collection('boardInvites').doc(id).set({ role: inv.role, name: inv.name, status: 'removed' }, { merge: true });
-    logActivity(`${myName()} removed ${inv.name}’s board selection (${inv.role})`);
+    logActivity(`${myName()} removed ${inv.name}'s board selection (${inv.role})`);
     toast('Selection removed.');
   },
 
@@ -2432,7 +2433,7 @@ const ACTIONS = {
   deleteMeeting: async () => {
     const m = S.meetings.find(x => x.id === S.meetingId);
     if (!m) return;
-    const r = await modal({ title: `Delete “${m.title}”?`, text: 'Its attendance records will be deleted too.', okText: 'Delete meeting', danger: true });
+    const r = await modal({ title: `Delete "${m.title}"?`, text: 'Its attendance records will be deleted too.', okText: 'Delete meeting', danger: true });
     if (!r.ok) return;
     await db.collection('meetings').doc(m.id).delete();
     S.meetingId = null;
@@ -2473,7 +2474,7 @@ const ACTIONS = {
   approveLog: async id => {
     const log = S.logs.find(l => l.id === id);
     if (log && log.uid === uid()) {
-      const r = await modal({ title: 'Approve your own hours?', text: 'It’s best practice to have another approver review your submission.', okText: 'Approve anyway' });
+      const r = await modal({ title: 'Approve your own hours?', text: 'It\'s best practice to have another approver review your submission.', okText: 'Approve anyway' });
       if (!r.ok) return;
     }
     await approveLogById(id);
@@ -2493,7 +2494,7 @@ const ACTIONS = {
   rejectLog: async id => {
     const log = S.logs.find(l => l.id === id);
     if (!log) return;
-    const r = await modal({ title: `Reject ${log.name}’s hours?`, text: `${fmtHours(log.hours)} hrs for ${log.event}. Add a short reason so they know what to fix.`, input: { type: 'textarea', placeholder: 'Reason (optional)' }, okText: 'Reject', danger: true });
+    const r = await modal({ title: `Reject ${log.name}'s hours?`, text: `${fmtHours(log.hours)} hrs for ${log.event}. Add a short reason so they know what to fix.`, input: { type: 'textarea', placeholder: 'Reason (optional)' }, okText: 'Reject', danger: true });
     if (!r.ok) return;
     await db.runTransaction(async tx => {
       const ref = db.collection('hourLogs').doc(id);
@@ -2529,10 +2530,10 @@ const ACTIONS = {
   rejectClaim: async id => {
     const c = S.claims.find(x => x.id === id);
     if (!c) return;
-    const r = await modal({ title: `Reject ${c.name}’s application?`, text: `They applied for ${c.role}.`, input: { type: 'textarea', placeholder: 'Note for the applicant (optional)' }, okText: 'Reject', danger: true });
+    const r = await modal({ title: `Reject ${c.name}'s application?`, text: `They applied for ${c.role}.`, input: { type: 'textarea', placeholder: 'Note for the applicant (optional)' }, okText: 'Reject', danger: true });
     if (!r.ok) return;
     await db.collection('roleClaims').doc(id).update({ status: 'rejected', reason: r.value.slice(0, 300), reviewedBy: myName(), reviewedAt: FV.serverTimestamp() });
-    logActivity(`${myName()} rejected ${c.name}’s application for ${c.role}`);
+    logActivity(`${myName()} rejected ${c.name}'s application for ${c.role}`);
     toast('Application rejected.');
   },
 
@@ -2546,7 +2547,7 @@ const ACTIONS = {
   resolveIssue: async id => {
     const i = S.issues.find(x => x.id === id);
     await db.collection('issues').doc(id).update({ status: 'resolved', resolvedBy: myName(), resolvedAt: FV.serverTimestamp() });
-    if (i) logActivity(`${myName()} resolved ${i.name}’s issue (${i.type})`);
+    if (i) logActivity(`${myName()} resolved ${i.name}'s issue (${i.type})`);
     toast('Issue marked resolved.', 'ok');
   },
 
@@ -2557,7 +2558,7 @@ const ACTIONS = {
 
   deleteEvent: async id => {
     const e = S.events.find(x => x.id === id);
-    const r = await modal({ title: `Delete “${e?.name || 'this event'}”?`, text: 'Hours already logged for it stay on record.', okText: 'Delete', danger: true });
+    const r = await modal({ title: `Delete "${e?.name || 'this event'}"?`, text: 'Hours already logged for it stay on record.', okText: 'Delete', danger: true });
     if (!r.ok) return;
     await db.collection('events').doc(id).delete();
     logActivity(`${myName()} deleted event ${e?.name || ''}`);
@@ -2573,7 +2574,7 @@ const ACTIONS = {
     if (!delta || !isFinite(delta)) throw appErr('Enter a number other than 0.');
     if ((Number(u.totalHours) || 0) + delta < 0) throw appErr('That would make their total negative.');
     await vol(u.id).set({ totalHours: FV.increment(delta) }, { merge: true });
-    logActivity(`${myName()} adjusted ${u.name}’s hours by ${delta > 0 ? '+' : ''}${fmtHours(delta)}`);
+    logActivity(`${myName()} adjusted ${u.name}'s hours by ${delta > 0 ? '+' : ''}${fmtHours(delta)}`);
     toast(`${u.name} now has ${fmtHours((Number(u.totalHours) || 0) + delta)} hours.`, 'ok');
   },
 
@@ -2600,14 +2601,14 @@ async function changeRole(u, next) {
   const text = demote.length
     ? `${demote.map(d => d.name).join(', ')} will move back to Member to open the seat.`
     : next === 'Member' ? `${u.name} will lose board access.` : `${u.name} gets ${next} access right away.`;
-  const r = await modal({ title: next === 'Member' ? `Remove ${u.name}’s board role?` : `Make ${u.name} ${next}?`, text, okText: 'Change role', danger: next === 'Member' || demote.length > 0 });
+  const r = await modal({ title: next === 'Member' ? `Remove ${u.name}'s board role?` : `Make ${u.name} ${next}?`, text, okText: 'Change role', danger: next === 'Member' || demote.length > 0 });
   if (!r.ok) return false;
   const batch = db.batch();
   batch.set(vol(u.id), { role: next, roleApprovedAt: FV.serverTimestamp(), roleApprovedBy: myName() }, { merge: true });
   demote.forEach(d => { batch.set(vol(d.id), { role: 'Member' }, { merge: true }); revokeInvitesFor(batch, d); });
   if (next === 'Member') revokeInvitesFor(batch, u);
   await batch.commit();
-  logActivity(`${myName()} changed ${u.name}’s role to ${next}`);
+  logActivity(`${myName()} changed ${u.name}'s role to ${next}`);
   toast(`${u.name} is now ${next}.`, 'ok');
   return true;
 }
@@ -2667,7 +2668,7 @@ function bindApp() {
         }
         const date = $('#hDate').value;
         if (!date) throw appErr('Pick the date you volunteered.');
-        if (date > todayISO()) throw appErr('You can’t log hours for a future date.');
+        if (date > todayISO()) throw appErr('You can\'t log hours for a future date.');
         const hours = Math.round(parseFloat($('#hHours').value) * 100) / 100;
         if (!(hours > 0) || hours > 24) throw appErr('Hours must be between 0.25 and 24.');
 
@@ -2683,7 +2684,7 @@ function bindApp() {
           status: 'pending', submittedAt: FV.serverTimestamp(),
         });
         logActivity(`${myName()} submitted ${fmtHours(hours)} hrs for ${event}`);
-        toast(`Submitted ${fmtHours(hours)} hrs for ${event}. You’ll see it here once it’s approved.`, 'ok');
+        toast(`Submitted ${fmtHours(hours)} hrs for ${event}. You'll see it here once it's approved.`, 'ok');
         $('#hoursForm').reset();
         $('#hDate').value = todayISO();
         $('#hOtherWrap').classList.add('hidden');
@@ -2759,7 +2760,7 @@ function bindApp() {
         const role = $('#ivRole').value;
         const email = $('#ivEmail').value.trim().toLowerCase();
         if (!name || !role) throw appErr('Add a name and choose a role.');
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw appErr('That email address doesn’t look right.');
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw appErr('That email address doesn\'t look right.');
         const id = slug(role + '-' + name);
         await db.collection('boardInvites').doc(id).set({ role, name, email, status: 'open', acceptedUid: null, createdBy: myName(), createdAt: FV.serverTimestamp() }, { merge: true });
         logActivity(`${myName()} selected ${name} for ${role}`);
@@ -2802,9 +2803,9 @@ function bindApp() {
         if (!m || !m.checkinOpen) throw appErr('Check-in for this meeting is closed.');
         const code = form.querySelector('input').value.trim().toUpperCase();
         if (!code) throw appErr('Enter the code shown at the meeting.');
-        if (code !== String(m.code || '').toUpperCase()) throw appErr('That code doesn’t match. Check the screen and try again.');
+        if (code !== String(m.code || '').toUpperCase()) throw appErr('That code doesn\'t match. Check the screen and try again.');
         await db.collection('meetings').doc(m.id).update({ [`attendance.${uid()}`]: { status: 'present', name: myName(), by: 'self check-in', at: FV.serverTimestamp() } });
-        toast(`You’re checked in to ${m.title}!`, 'ok');
+        toast(`You're checked in to ${m.title}!`, 'ok');
       } catch (err) { toast(friendly(err), 'error'); }
     });
   });
