@@ -2045,9 +2045,11 @@ function renderAccounts() {
     const owner = isOwnerEmail(u.email);
     const links = linkedInvites(u);
     const accBtns = owner ? '<span class="item-meta">Owner</span>'
-      : '<button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="' + esc(u.id) + '">Unlink</button>'
-      + '<button class="btn btn-sm ' + (u.blocked ? 'btn-ghost' : 'btn-danger') + '" data-action="toggleBlock" data-id="' + esc(u.id) + '">' + (u.blocked ? 'Unblock' : 'Block') + '</button>'
-      + '<button class="btn btn-sm btn-danger" data-action="deleteAccount" data-id="' + esc(u.id) + '">Delete</button>';
+      : '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
+      + '<button class="btn btn-sm btn-ghost" data-action="unlinkAccount" data-id="' + esc(u.id) + '">Unlink</button>'
+      + '<button class="btn btn-sm ' + (u.blocked ? 'btn-ghost' : 'btn-soft-bad') + '" data-action="toggleBlock" data-id="' + esc(u.id) + '">' + (u.blocked ? 'Unblock' : 'Block') + '</button>'
+      + '<button class="btn btn-sm btn-danger" data-action="deleteAccount" data-id="' + esc(u.id) + '">Delete</button>'
+      + '</div>';
     return `<tr class="${u.blocked ? 'blocked' : ''}">
       <td><div class="who">${avatar(u.name)}<div><b>${esc(u.name)}${u.blocked ? ' <span class="chip rejected">Blocked</span>' : ''}</b><span>${esc(u.email || 'no email')}</span></div></div></td>
       <td>${esc(u.provider || '—')}</td>
